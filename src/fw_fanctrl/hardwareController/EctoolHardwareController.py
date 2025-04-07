@@ -1,5 +1,5 @@
-import re
-import subprocess
+import ctypes
+import pathlib
 from abc import ABC
 
 from fw_fanctrl.hardwareController.HardwareController import HardwareController
@@ -10,66 +10,59 @@ class EctoolHardwareController(HardwareController, ABC):
     nonBatterySensors = None
 
     def __init__(self, no_battery_sensor_mode=False):
+        # Load the shared library into ctypes
+        self.libname = pathlib.Path().absolute() / "libectool.so"
+        self.ectool_lib = ctypes.CDLL(self.libname)
+
         if no_battery_sensor_mode:
             self.noBatterySensorMode = True
             self.populate_non_battery_sensors()
 
     def populate_non_battery_sensors(self):
         self.nonBatterySensors = []
-        raw_out = subprocess.run(
-            "ectool tempsinfo all",
-            stdout=subprocess.PIPE,
-            shell=True,
-            text=True,
-        ).stdout
-        battery_sensors_raw = re.findall(r"\d+ Battery", raw_out, re.MULTILINE)
-        battery_sensors = [x.split(" ")[0] for x in battery_sensors_raw]
-        for x in re.findall(r"^\d+", raw_out, re.MULTILINE):
-            if x not in battery_sensors:
-                self.nonBatterySensors.append(x)
+
+        # Tell ctypes the format of `BatteryInfo` struct
+        class BatteryInfo(ctypes.Structure):
+            _fields_ = [
+                ("capacity", ctypes.c_int),
+                ("kilowatts", ctypes.c_float)
+            ]
+
+        # Set return type of get_battery_info() function
+        self.ectool_lib.get_battery_info.restype = BatteryInfo
+        
+        # Call get_temperature() function to get battery information
+        battery_info = self.ectool_lib.get_battery_info()
+
+        # Append each member into list
+        for info in battery_info:
+            self.nonBatterySensors.append(info)
 
     def get_temperature(self):
-        if self.noBatterySensorMode:
-            raw_out = "".join(
-                [
-                    subprocess.run(
-                        "ectool temps " + x,
-                        stdout=subprocess.PIPE,
-                        shell=True,
-                        text=True,
-                    ).stdout
-                    for x in self.nonBatterySensors
-                ]
-            )
-        else:
-            raw_out = subprocess.run(
-                "ectool temps all",
-                stdout=subprocess.PIPE,
-                shell=True,
-                text=True,
-            ).stdout
-        raw_temps = re.findall(r"\(= (\d+) C\)", raw_out)
-        temps = sorted([x for x in [int(x) for x in raw_temps] if x > 0], reverse=True)
-        # safety fallback to avoid damaging hardware
-        if len(temps) == 0:
-            return 50
-        return float(round(temps[0], 2))
-
+        # Set return type of get_temperature() function
+        self.ectool_lib.get_temperature.restype = ctypes.c_int
+        
+        # Call get_temperature() function to get temperature
+        temps = self.ectool_lib.get_temperature()
+        
+        return temps
+        
     def set_speed(self, speed):
-        subprocess.run(f"ectool fanduty {speed}", stdout=subprocess.PIPE, shell=True)
+        # Call set_speed() function to set fan speed
+        self.ectool_lib.set_speed(speed)
 
     def is_on_ac(self):
-        raw_out = subprocess.run(
-            "ectool battery",
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            shell=True,
-            text=True,
-        ).stdout
-        return len(re.findall(r"Flags.*(AC_PRESENT)", raw_out)) > 0
+        # Set return type of is_on_ac() function
+        self.ectool_lib.is_on_ac.restype = ctypes.c_bool
+        
+        # Call is_on_ac() function to check if laptop is on AC or DC power
+        on_ac = self.ectool_lib.is_on_ac()
+        
+        return on_ac
 
     def pause(self):
-        subprocess.run("ectool autofanctrl", stdout=subprocess.PIPE, shell=True)
+        # Call pause() function to pause fan
+        self.ectool_lib.pause()
 
     def resume(self):
         # Empty for ectool, as setting an arbitrary speed disables the automatic fan control
