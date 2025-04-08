@@ -16,35 +16,35 @@ Take a look at commit [1969160](https://github.com/the-z3ron3/fw-fanctrl_ectool_
 ## Usage
 
 1. Clone the repository.
-`
+```
 git clone https://github.com/the-z3ron3/fw-fanctrl_ectool_binding
-`
+```
 
 2. Go into `fw-fanctrl_ectool_binding` directory.
-`
+```
 cd fw-fanctrl_ectool_binding
-`
+```
 
 3. Install fw-fanctrl.
-`
+```
 ./install.sh
-`
+```
 
 4. Go into `libectool` directory.
-`
+```
 cd libectool
-`
+```
 
 4. Execute `build.sh` shell script.
-`
+```
 ./build.sh
-`
+```
 It will compile `ectool.c`, `ectool.h` and generate `libectool.so` file. The shared object file will also be copied into the root repository folder (fw-fanctrl_ectool_binding) so no need to manually copy it.
 
 5. Run fw-fanctrl.
-`
+```
 fw-fanctrl run
-`
+```
 
 ![fw-fanctrl run](https://github.com/user-attachments/assets/8372bbab-eea7-4b4b-a922-53037a3c0df8)
 
